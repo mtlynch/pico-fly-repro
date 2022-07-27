@@ -278,6 +278,8 @@ func (d db) InsertEntry(reader io.Reader, metadata types.UploadMetadata) error {
 		return err
 	}
 
+	defer d.shrinkMemory()
+
 	return tx.Commit()
 }
 
@@ -338,6 +340,8 @@ func (d db) DeleteEntry(id types.EntryID) error {
 		log.Printf("delete from entries_data table failed, aborting transaction: %v", err)
 		return err
 	}
+
+	defer d.shrinkMemory()
 
 	return tx.Commit()
 }
@@ -464,8 +468,18 @@ func (d db) Compact() error {
 	}
 
 	log.Printf("vacuuming complete")
+	d.shrinkMemory()
 
 	return nil
+}
+
+func (d db) shrinkMemory() {
+	log.Printf("shrinking SQLite memory")
+	if _, err := d.ctx.Exec(`PRAGMA shrink_memory`); err != nil {
+		log.Printf("shrinking SQLite memory failed: %v", err)
+		return
+	}
+	log.Printf("shrinking SQLite memory succeeded")
 }
 
 func guestLinkFromRow(row rowScanner) (types.GuestLink, error) {
